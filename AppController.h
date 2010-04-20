@@ -11,6 +11,7 @@
 
 @interface AppController : NSObject {
 
+    IBOutlet NSView* drawView;
 }
 
 @end
