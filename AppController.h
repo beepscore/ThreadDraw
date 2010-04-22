@@ -11,7 +11,18 @@
 
 @interface AppController : NSObject {
 
-    IBOutlet NSView* drawView;
+    NSView* drawView;
+    NSButton* redCheckbox;
+    NSButton* greenCheckbox;
+    NSButton* blueCheckbox;
 }
+
+#pragma mark properties
+// use atomic properties for thread safety
+@property(retain)IBOutlet NSView* drawView;
+
+@property(retain)IBOutlet NSButton *redCheckbox;
+@property(retain)IBOutlet NSButton *greenCheckbox;
+@property(retain)IBOutlet NSButton *blueCheckbox;
 
 @end
