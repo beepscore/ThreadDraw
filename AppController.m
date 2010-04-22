@@ -96,7 +96,13 @@
                            withObject:[NSColor blueColor]];
 }
 
+
 // ????: don't dealloc properties used by threads?
+
+
+- (IBAction)handleClearDrawingButton:(id)sender{
+    [[self drawView] setNeedsDisplay:YES];
+}
 
 @end
 

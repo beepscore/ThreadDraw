@@ -25,4 +25,6 @@
 @property(retain)IBOutlet NSButton *greenCheckbox;
 @property(retain)IBOutlet NSButton *blueCheckbox;
 
+- (IBAction)handleClearDrawingButton:(id)sender;
+
 @end
