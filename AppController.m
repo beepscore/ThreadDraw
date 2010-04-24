@@ -7,18 +7,67 @@
 //
 
 #import "AppController.h"
-#import <unistd.h> // for sleep
-
-#define SLEEP_TIME_MICROSECONDS 500000
 
 @implementation AppController
 
 #pragma mark properties
-@synthesize drawView;
-@synthesize redCheckbox;
-@synthesize greenCheckbox;
-@synthesize blueCheckbox;
+@synthesize drawView = drawView_;
 
+@synthesize shouldDrawColor1;
+@synthesize shouldDrawColor2;
+@synthesize shouldDrawColor3;
+
+@synthesize color1 = color1_;
+@synthesize color2 = color2_;
+@synthesize color3 = color3_;
+
+
+- (id)init
+{
+    self = [super init];
+    if (nil != self) {
+        // set up the colors we want to draw with
+        self.color1 = [NSColor redColor];
+        self.color2 = [NSColor greenColor];
+        self.color3 = [NSColor blueColor];
+        
+        self.shouldDrawColor1 = YES;
+        self.shouldDrawColor2 = YES;
+        self.shouldDrawColor3 = YES;
+    }
+    return self;
+}
+
+
+-(void)awakeFromNib
+{
+    [[self drawView] setNeedsDisplay:YES];
+    
+    // start 3 drawing threads
+    [NSThread detachNewThreadSelector:@selector(threadDrawForColor:) 
+                             toTarget:self
+                           withObject:[self color1]];
+    
+    [NSThread detachNewThreadSelector:@selector(threadDrawForColor:) 
+                             toTarget:self
+                           withObject:[self color2]];    
+    
+    [NSThread detachNewThreadSelector:@selector(threadDrawForColor:) 
+                             toTarget:self
+                           withObject:[self color3]];    
+}
+
+
+- (void)dealloc
+{
+    [color1_ release], color1_ = nil;
+    [color2_ release], color2_ = nil;
+    [color3_ release], color3_ = nil;
+    [super dealloc];
+}
+
+
+#pragma mark drawing
 
 - (NSPoint) randomPointInBounds: (NSRect) bounds
 {
@@ -31,73 +80,70 @@
     return (result);
 }
 
+- (BOOL)shouldDrawColor:(NSColor*)color
+{
+    // use atomic properties for thread safety
+    if ((color == self.color1 && self.shouldDrawColor1) ||
+        (color == self.color2 && self.shouldDrawColor2) ||
+        (color == self.color3 && self.shouldDrawColor3))
+    {
+        return YES;
+    }
+    return NO;
+}
 
-- (void)threadDraw:(NSColor *)color
+
+- (void)threadDrawForColor:(NSColor *)color
 {
     NSAutoreleasePool *poolOne = [[NSAutoreleasePool alloc] init];
+    NSLog(@"Started threadForColor: %@", [color description]);
     
-    BOOL okToDraw = NO;
-    NSPoint lastPoint = [drawView bounds].origin;
+    NSPoint lastPoint = [[self drawView] bounds].origin;
     
-    while (true) {
-        
-        // sb added
-        NSAutoreleasePool *poolTwo = [[NSAutoreleasePool alloc] init];
-        
-        // for each color, get state of its checkbox - probably can do this more elegantly
-        if ((([NSColor redColor] == color) && (NSOnState == [[self redCheckbox] state])) ||
-            (([NSColor greenColor] == color) && (NSOnState == [[self greenCheckbox] state])) ||
-            (([NSColor blueColor] == color) && (NSOnState == [[self blueCheckbox] state])) ) {
-            okToDraw = YES;
-        } else {
-            okToDraw = NO;
-        }        
-        NSLog(@"okToDraw = %d", okToDraw);
-        
-        // ????: this stops drawing but won't restart it.  Why?
-        // Evaluating lockFocusIfCanDraw locks focus even if okToDraw is false, then we don't unlock?
-        // if ([[self drawView] lockFocusIfCanDraw] && okToDraw) {
-        
-        if (okToDraw) {
+    // this thread runs indefinitely
+    while (true)
+    {        
+        if ([[self drawView] lockFocusIfCanDraw])
+        {
+            NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
             
-            if ([[self drawView] lockFocusIfCanDraw]) {
+            if ([self shouldDrawColor:color])
+            {
                 NSPoint point;
-                point = [self randomPointInBounds:[drawView bounds]];
+                point = [self randomPointInBounds:[[self drawView] bounds]];
                 [color set];
                 [NSBezierPath strokeLineFromPoint:lastPoint 
                                           toPoint:point];
                 [[[self drawView] window] flushWindow];
-                [[self drawView] unlockFocus];
-                usleep (random() % SLEEP_TIME_MICROSECONDS); // up to 1/2 second 
                 lastPoint = point;
             }
+            [[self drawView] unlockFocus];
+            [pool release];
         }
-        // sb added
-        [poolTwo release];
     }
+    NSLog(@"Exited threadForColor: %@", [color description]);
     [poolOne release];
 }
 
 
-- (void)awakeFromNib
-{
-    [[self drawView] setNeedsDisplay:YES];
-    
-    [NSThread detachNewThreadSelector:@selector(threadDraw:) 
-                             toTarget:self
-                           withObject:[NSColor redColor]];
-    
-    [NSThread detachNewThreadSelector:@selector(threadDraw:) 
-                             toTarget:self
-                           withObject:[NSColor greenColor]];    
-    
-    [NSThread detachNewThreadSelector:@selector(threadDraw:) 
-                             toTarget:self
-                           withObject:[NSColor blueColor]];
+#pragma mark -
+#pragma mark IBAction
+
+// Use checkboxes in view to set applicationController's properties.
+// This is better MVC design than inspecting view checkbox properties in the controller.
+- (IBAction)drawColor1Checked:(id)sender{
+    self.shouldDrawColor1 = (NSOnState == [sender state]);
 }
 
 
-// ????: don't dealloc properties used by threads?
+- (IBAction)drawColor2Checked:(id)sender{
+    self.shouldDrawColor2 = (NSOnState == [sender state]);
+}
+
+
+- (IBAction)drawColor3Checked:(id)sender{
+    self.shouldDrawColor3 = (NSOnState == [sender state]);
+}
 
 
 - (IBAction)handleClearDrawingButton:(id)sender{
